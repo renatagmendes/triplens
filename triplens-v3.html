@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Triplens</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root {
+  --bg:#F8F5F0; --ink:#1A1714; --ink2:#6B6460; --ink3:#B0AAA4;
+  --gold:#A8884A; --gold-soft:rgba(168,136,74,0.10); --gold-border:rgba(168,136,74,0.28);
+  --white:#FFFFFF; --border:rgba(26,23,20,0.08); --card-border:rgba(26,23,20,0.11);
+  --green:#2D6A4F; --green-soft:rgba(45,106,79,0.08); --green-border:rgba(45,106,79,0.25);
+  --rest:#8B3A3A; --bar:#4A3A6B; --cafe:#6B4A1E; --shop:#1E4A6B; --act:#2A5C3A;
+  --radius:14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100vh; background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; }
+body { display: flex; flex-direction: column; }
+
+/* ── HEADER ── */
+.header {
+  padding: 1.1rem 2rem; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border); background: var(--white); flex-shrink: 0;
+}
+.logo { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; }
+.logo em { font-style: italic; color: var(--gold); }
+.header-meta { display: flex; align-items: center; gap: 14px; }
+.header-dest { font-size: 13px; color: var(--ink2); }
+.header-dest strong { color: var(--ink); }
+.header-step { font-size: 11px; color: var(--ink3); letter-spacing: 0.05em; }
+
+/* ── PROGRESS ── */
+.progress-bar { height: 2px; background: var(--border); flex-shrink: 0; }
+.progress-fill { height: 100%; background: var(--gold); transition: width 0.45s ease; }
+
+/* ── STEP NAV ── */
+.step-nav {
+  display: flex; background: var(--white); border-bottom: 1px solid var(--border);
+  padding: 0 2rem; flex-shrink: 0; overflow-x: auto; gap: 0;
+}
+.step-nav::-webkit-scrollbar { height: 0; }
+.snav {
+  font-size: 12px; padding: 11px 14px; color: var(--ink3);
+  border-bottom: 2px solid transparent; white-space: nowrap;
+  letter-spacing: 0.03em; transition: all 0.2s; cursor: default;
+}
+.snav.active { color: var(--ink); border-bottom-color: var(--gold); }
+.snav.done { color: var(--green); }
+
+/* ── MAIN CONTENT ── */
+.main { flex: 1; padding: 2.5rem 2rem; max-width: 660px; margin: 0 auto; width: 100%; }
+.page { display: none; animation: fadeUp 0.3s ease forwards; }
+.page.active { display: block; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+
+/* ── TYPOGRAPHY ── */
+.eyebrow { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.page-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 4vw, 40px); font-weight: 400; line-height: 1.2; margin-bottom: 8px; }
+.page-sub { font-size: 14px; color: var(--ink2); line-height: 1.7; margin-bottom: 28px; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px; font-family: 'DM Sans', sans-serif; font-weight: 500;
+  padding: 12px 22px; border-radius: 10px; border: none; cursor: pointer; transition: all 0.18s;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--ink); color: var(--bg); }
+.btn-primary:hover { background: #000; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(26,23,20,0.18); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-ghost { background: transparent; color: var(--ink2); border: 1px solid var(--card-border); }
+.btn-ghost:hover { border-color: var(--ink3); color: var(--ink); }
+.btn-gold { background: var(--gold); color: var(--white); }
+.btn-gold:hover { background: #8a6e35; transform: translateY(-1px); }
+.nav-row { display: flex; align-items: center; justify-content: space-between; margin-top: 28px; gap: 12px; }
+.back-btn {
+  font-size: 13px; color: var(--ink3); background: none; border: none;
+  cursor: pointer; font-family: 'DM Sans', sans-serif; padding: 0;
+  transition: color 0.15s; display: flex; align-items: center; gap: 5px;
+}
+.back-btn:hover { color: var(--ink); }
+
+/* ── INPUTS ── */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); font-weight: 500; }
+.input, .textarea {
+  background: var(--white); border: 1.5px solid var(--card-border);
+  border-radius: var(--radius); padding: 12px 14px;
+  font-size: 14px; font-family: 'DM Sans', sans-serif;
+  color: var(--ink); outline: none; width: 100%;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input:focus, .textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+.input::placeholder, .textarea::placeholder { color: var(--ink3); }
+.textarea { resize: vertical; line-height: 1.65; min-height: 140px; }
+.textarea.big { min-height: 200px; font-size: 15px; }
+
+/* ── WELCOME PAGE ── */
+.welcome-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(34px, 6vw, 52px); font-weight: 300; line-height: 1.1; margin-bottom: 16px; }
+.welcome-title em { font-style: italic; color: var(--gold); }
+.welcome-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
+.welcome-tag { font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--card-border); color: var(--ink2); background: var(--white); }
+.dest-label { font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink3); margin-bottom: 8px; display: block; }
+.dest-input {
+  width: 100%; font-size: 22px; font-family: 'Cormorant Garamond', serif;
+  padding: 14px 0; border: none; border-bottom: 2px solid var(--ink);
+  background: transparent; color: var(--ink); outline: none; transition: border-color 0.2s;
+}
+.dest-input::placeholder { color: var(--ink3); font-style: italic; }
+.dest-input:focus { border-bottom-color: var(--gold); }
+
+/* ── OPTIONS (choice cards) ── */
+.options { display: flex; flex-direction: column; gap: 10px; }
+.options.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.option {
+  padding: 14px 18px; border-radius: var(--radius); border: 1px solid var(--card-border);
+  background: var(--white); cursor: pointer; transition: all 0.18s;
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.option:hover { border-color: var(--ink3); transform: translateY(-1px); }
+.option.sel { background: var(--ink); border-color: var(--ink); color: var(--white); transform: translateY(-1px); box-shadow: 0 6px 24px rgba(26,23,20,0.15); }
+.opt-emoji { font-size: 20px; flex-shrink: 0; line-height: 1.3; }
+.opt-label { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+.opt-desc { font-size: 12px; color: var(--ink2); line-height: 1.5; }
+.option.sel .opt-desc { color: rgba(248,245,240,0.55); }
+.multi-hint { font-size: 11px; color: var(--ink3); margin-bottom: 10px; }
+
+/* ── STEP DOTS ── */
+.step-dots { display: flex; gap: 6px; margin-bottom: 20px; }
+.sdot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: all 0.3s; }
+.sdot.done { background: var(--gold); opacity: 0.5; }
+.sdot.active { background: var(--ink); width: 20px; border-radius: 3px; }
+
+/* ── METHOD TOGGLE (page 1) ── */
+.method-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.method-btn {
+  padding: 14px 16px; border-radius: var(--radius); border: 1.5px solid var(--card-border);
+  background: var(--white); cursor: pointer; display: flex; align-items: center; gap: 10px;
+  transition: all 0.18s; font-family: 'DM Sans', sans-serif;
+}
+.method-btn:hover { border-color: var(--ink3); transform: translateY(-1px); }
+.method-btn.on { border-color: var(--ink); background: var(--ink); color: var(--white); }
+.method-icon { font-size: 20px; flex-shrink: 0; }
+.method-label { font-size: 14px; font-weight: 500; }
+.method-desc { font-size: 11px; color: var(--ink3); margin-top: 1px; }
+.method-btn.on .method-desc { color: rgba(248,245,240,0.45); }
+.input-panel { display: none; }
+.input-panel.on { display: block; }
+.upload-zone {
+  border: 2px dashed var(--card-border); border-radius: var(--radius);
+  padding: 36px 20px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: var(--white);
+}
+.upload-zone:hover, .upload-zone.drag { border-color: var(--gold); background: var(--gold-soft); }
+.upload-zone-icon { font-size: 32px; margin-bottom: 10px; }
+.upload-zone-label { font-size: 14px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+.upload-zone-sub { font-size: 12px; color: var(--ink3); }
+.upload-input { display: none; }
+.upload-previews { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.preview-wrap { position: relative; }
+.preview-thumb { width: 80px; height: 80px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); display: block; }
+.preview-remove {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--ink); color: var(--white);
+  font-size: 10px; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.upload-note { font-size: 12px; color: var(--ink3); margin-top: 10px; font-style: italic; }
+
+/* ── TIP INPUT (page 1) ── */
+.hint-box {
+  background: var(--gold-soft); border: 1px solid var(--gold-border);
+  border-radius: 10px; padding: 12px 15px; margin-bottom: 14px;
+  font-size: 12px; color: var(--ink2); line-height: 1.7; font-style: italic;
+}
+.tips-queue { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.queue-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+.queue-count { background: var(--green-soft); color: var(--green); font-size: 11px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--green-border); }
+.queue-item {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px;
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.qi-text { font-size: 12px; color: var(--ink2); flex: 1; line-height: 1.5; }
+.qi-who { font-size: 11px; color: var(--gold); white-space: nowrap; padding-top: 1px; }
+.qi-del { background: none; border: none; color: var(--ink3); cursor: pointer; font-size: 14px; transition: color 0.15s; flex-shrink: 0; }
+.qi-del:hover { color: var(--rest); }
+.add-more-tip { font-size: 13px; color: var(--gold); background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; padding: 0; text-decoration: underline; text-underline-offset: 3px; transition: color 0.15s; }
+.add-more-tip:hover { color: var(--ink); }
+
+/* ── FRIEND CARDS (page 2) ── */
+.friend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.friend-card {
+  padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--card-border);
+  background: var(--white); cursor: pointer; transition: all 0.18s;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.friend-card:hover { border-color: var(--ink3); transform: translateY(-1px); }
+.friend-card.sel { background: var(--ink); border-color: var(--ink); color: var(--white); }
+.fc-name { font-size: 14px; font-weight: 500; }
+.fc-tags { font-size: 11px; color: var(--ink3); line-height: 1.4; }
+.friend-card.sel .fc-tags { color: rgba(248,245,240,0.45); }
+.new-friend-btn {
+  width: 100%; padding: 13px 16px; border-radius: var(--radius);
+  border: 1.5px dashed var(--card-border); background: transparent;
+  color: var(--ink2); font-size: 13px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; transition: all 0.18s; text-align: center; display: block;
+}
+.new-friend-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── FRIEND PROFILE (page 3) ── */
+.trust-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.trust-opt {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px;
+  border-radius: 10px; border: 1px solid var(--border); cursor: pointer;
+  background: var(--bg); transition: all 0.15s;
+}
+.trust-opt:hover { border-color: var(--ink3); }
+.trust-opt.sel { border-color: var(--ink); background: var(--ink); color: var(--white); }
+.trust-opt-emoji { font-size: 18px; flex-shrink: 0; }
+.trust-opt-label { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+.trust-opt-desc { font-size: 11px; color: var(--ink2); line-height: 1.4; }
+.trust-opt.sel .trust-opt-desc { color: rgba(248,245,240,0.5); }
+
+.spec-section-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); margin-bottom: 10px; margin-top: 4px; }
+.spec-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+.spec-pill {
+  padding: 6px 13px; border-radius: 20px; border: 1px solid var(--card-border);
+  background: var(--white); font-size: 12px; color: var(--ink2);
+  cursor: pointer; transition: all 0.15s;
+}
+.spec-pill:hover { border-color: var(--ink3); }
+.spec-pill.sel { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
+
+/* ── RESULT CARD (page 5: your profile) ── */
+.result-card {
+  background: var(--white); border: 1px solid var(--card-border);
+  border-radius: 20px; padding: 28px 30px; margin-bottom: 16px;
+}
+.result-dest { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.result-title { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 400; margin-bottom: 4px; }
+.result-sub { font-size: 13px; color: var(--ink2); margin-bottom: 24px; }
+.profile-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 22px; }
+.profile-tag { font-size: 12px; padding: 4px 12px; border-radius: 20px; background: var(--gold-soft); border: 1px solid var(--gold-border); color: var(--gold); }
+.rules-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 10px; }
+.rules-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.rules-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--ink2); line-height: 1.5; }
+.rule-icon { color: var(--gold); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── PROCESSING ── */
+.proc-wrap { text-align: center; padding: 40px 0 20px; }
+.proc-icon { font-size: 48px; margin-bottom: 20px; display: block; animation: breathe 2.5s ease-in-out infinite; }
+@keyframes breathe { 0%,100%{transform:scale(1);opacity:0.9;} 50%{transform:scale(1.05);opacity:1;} }
+.proc-title { font-family: 'Cormorant Garamond', serif; font-size: 32px; margin-bottom: 8px; }
+.proc-sub { font-size: 14px; color: var(--ink2); margin-bottom: 28px; line-height: 1.65; }
+.proc-log {
+  background: var(--ink); border-radius: 12px; padding: 16px;
+  font-family: 'DM Sans', monospace; font-size: 12px; color: rgba(248,245,240,0.5);
+  line-height: 2; text-align: left; min-height: 80px;
+}
+.proc-log .ll { animation: li 0.3s ease; display: block; }
+.proc-log .lg { color: var(--gold); }
+@keyframes li { from{opacity:0;transform:translateY(5px);} to{opacity:1;transform:none;} }
+.proc-bar-wrap { height: 2px; background: var(--border); margin-top: 18px; overflow: hidden; border-radius: 2px; }
+.proc-bar { height: 100%; background: var(--gold); transition: width 0.6s ease; width: 0%; }
+
+/* ── MAP PAGE ── */
+#page-map { max-width: none; padding: 0; }
+.map-body { display: flex; height: calc(100vh - 106px); }
+
+.map-sidebar {
+  width: 320px; flex-shrink: 0; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; background: var(--bg); overflow: hidden;
+}
+.map-filters {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  background: var(--white); display: flex; gap: 8px;
+}
+.filter-wrap { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.filter-label { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink3); }
+.filter-select {
+  font-size: 12px; padding: 5px 22px 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif;
+  appearance: none; -webkit-appearance: none; cursor: pointer; outline: none; transition: border-color 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23B0AAA4' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 7px center;
+}
+.filter-select:focus { border-color: var(--gold); }
+.map-cat-bar {
+  background: var(--white); border-bottom: 1px solid var(--border);
+  padding: 0 12px; display: flex; align-items: center; gap: 6px;
+  height: 38px; overflow-x: auto; flex-shrink: 0;
+}
+.map-cat-bar::-webkit-scrollbar { display: none; }
+.cat-tab {
+  padding: 3px 11px; height: 24px; border-radius: 20px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--ink3); font-size: 11px; font-family: 'DM Sans', sans-serif;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
+}
+.cat-tab:hover { color: var(--ink); border-color: var(--ink3); }
+.cat-tab.on { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.map-count { font-size: 11px; color: var(--ink3); padding: 6px 12px 0; }
+.map-cards { flex: 1; overflow-y: auto; padding: 8px 8px 40px; }
+.map-cards::-webkit-scrollbar { width: 3px; }
+.map-cards::-webkit-scrollbar-thumb { background: var(--border); }
+.sec-label {
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink3); padding: 8px 4px 5px;
+  display: flex; align-items: center; gap: 6px;
+}
+.sec-label::after { content:''; flex:1; height:1px; background: var(--border); }
+
+/* PLACE CARD */
+.pc {
+  padding: 9px 11px; border-radius: 8px; margin-bottom: 5px;
+  cursor: pointer; border: 1px solid var(--border);
+  transition: all 0.15s; background: var(--white); display: flex; flex-direction: column; gap: 3px;
+}
+.pc:hover { border-color: var(--gold-border); box-shadow: 0 2px 8px rgba(168,136,74,0.08); }
+.pc.lit { border-color: var(--gold); background: var(--gold-soft); }
+.pc-r1 { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.pc-name { font-size: 13px; font-weight: 500; color: var(--ink); flex: 1; line-height: 1.3; }
+.pc-meta { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.pc-score { font-size: 10px; color: var(--ink3); font-family: 'DM Sans', monospace; }
+.pc-pill { font-size: 10px; padding: 1px 6px; border-radius: 20px; white-space: nowrap; }
+.pill-rest { background: rgba(139,58,58,0.08); color: var(--rest); }
+.pill-bar  { background: rgba(74,58,107,0.08); color: var(--bar); }
+.pill-cafe { background: rgba(107,74,30,0.08); color: var(--cafe); }
+.pill-shop { background: rgba(30,74,107,0.08); color: var(--shop); }
+.pill-act  { background: rgba(42,92,58,0.08); color: var(--act); }
+.pc-who { font-size: 10px; color: var(--ink3); }
+.pc-overlap { font-size: 10px; color: var(--gold); font-weight: 500; }
+.pc-note-wrap { overflow: hidden; max-height: 0; transition: max-height 0.25s; }
+.pc-note-wrap.open { max-height: 220px; }
+.pc-note { font-size: 11px; color: var(--ink2); line-height: 1.55; padding-top: 5px; }
+.pc-reason { font-size: 11px; color: var(--ink3); line-height: 1.5; padding-top: 3px; font-style: italic; }
+.pc-links { display: flex; gap: 8px; padding-top: 5px; }
+.pc-link { font-size: 10px; color: var(--gold); text-decoration: none; border-bottom: 1px solid var(--gold-border); padding-bottom: 1px; transition: color 0.15s; }
+.pc-link:hover { color: var(--ink); }
+.pc-toggle { font-size: 10px; color: var(--ink3); cursor: pointer; background: none; border: none; font-family: 'DM Sans', sans-serif; padding: 0; transition: color 0.15s; }
+.pc-toggle:hover { color: var(--gold); }
+
+/* MAP */
+.map-wrap { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; }
+.leaflet-popup-content-wrapper { background: var(--white); border: 1px solid var(--card-border); border-radius: 10px; color: var(--ink); box-shadow: 0 4px 24px rgba(26,23,20,0.12); }
+.leaflet-popup-tip { background: var(--white); }
+.leaflet-popup-content { margin: 10px 13px; font-family: 'DM Sans', sans-serif; min-width: 190px; }
+.pop-name { font-family: 'Cormorant Garamond', serif; font-size: 16px; color: var(--ink); margin-bottom: 2px; }
+.pop-meta { font-size: 11px; color: var(--ink3); margin-bottom: 4px; }
+.pop-score-badge { display: inline-block; font-size: 11px; padding: 2px 8px; background: var(--gold-soft); color: var(--gold); border: 1px solid var(--gold-border); border-radius: 5px; margin-bottom: 6px; }
+.pop-overlap { font-size: 11px; color: var(--gold); font-weight: 500; margin-bottom: 5px; }
+.pop-note { font-size: 11px; color: var(--ink2); line-height: 1.5; margin-bottom: 7px; }
+.pop-links { display: flex; gap: 7px; flex-wrap: wrap; }
+.pop-link { font-size: 10px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--gold-border); color: var(--gold); text-decoration: none; transition: all 0.15s; }
+.pop-link:hover { background: var(--gold); color: var(--white); }
+.leaflet-control-zoom a { background: var(--white) !important; border-color: var(--border) !important; color: var(--ink2) !important; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px);
+  background: var(--ink); color: var(--bg); padding: 9px 18px;
+  border-radius: 8px; font-size: 13px; z-index: 9999;
+  opacity: 0; transition: all 0.3s; pointer-events: none;
+  box-shadow: 0 6px 24px rgba(26,23,20,0.2);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 600px) {
+  .main { padding: 1.75rem 1.25rem 5rem; }
+  .options.grid2, .friend-grid { grid-template-columns: 1fr; }
+  .map-body { flex-direction: column; }
+  .map-sidebar { width: 100%; height: 50vh; border-right: none; border-top: 1px solid var(--border); order: 2; }
+  .map-wrap { height: 50vh; order: 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<header class="header">
+  <div class="logo">trip<em>lens</em></div>
+  <div class="header-meta">
+    <span class="header-dest" id="header-dest"></span>
+    <span class="header-step" id="header-step"></span>
+  </div>
+</header>
+<div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+<nav class="step-nav">
+  <div class="snav" id="snav-0">Destino</div>
+  <div class="snav" id="snav-1">1 · Dica</div>
+  <div class="snav" id="snav-2">2 · Fonte</div>
+  <div class="snav" id="snav-3">3 · Perfil da fonte</div>
+  <div class="snav" id="snav-4">4 · Seu perfil</div>
+  <div class="snav" id="snav-5">5 · Mapa</div>
+</nav>
+
+<div class="main" id="main-wrap">
+
+<!-- ══ PAGE 0: WELCOME ══ -->
+<div class="page active" id="page-0">
+  <div class="eyebrow">Bem-vindo ao Triplens</div>
+  <h1 class="welcome-title">Suas dicas de viagem,<br><em>organizadas</em> para você.</h1>
+  <p class="page-sub">Cole recomendações de amigos, defina o peso de cada fonte e receba um mapa com taste fit calculado para o seu estilo.</p>
+  <div class="welcome-tags">
+    <span class="welcome-tag">🗺 Mapa interativo</span>
+    <span class="welcome-tag">⭐ Taste fit score</span>
+    <span class="welcome-tag">✦ Multi-fonte inteligente</span>
+  </div>
+  <label class="dest-label">Para onde você vai?</label>
+  <input class="dest-input" id="dest-input" type="text" placeholder="ex: Tokyo, Grécia, Lisboa..." oninput="onDestInput(this.value)" />
+  <div class="nav-row" style="margin-top:28px">
+    <span></span>
+    <button class="btn btn-primary" id="btn-start" onclick="startFlow()" disabled>Começar →</button>
+  </div>
+</div>
+
+<!-- ══ PAGE 1: DROP THE DICA ══ -->
+<div class="page" id="page-1">
+  <div class="eyebrow" id="p1-eyebrow">Passo 1</div>
+  <h1 class="page-title">Joga a <span style="font-family:'Cormorant Garamond',serif;font-style:italic">dica</span> aqui.</h1>
+  <p class="page-sub">Texto, print de conversa ou foto de post. O Claude lê tudo.</p>
+
+  <!-- METHOD TOGGLE -->
+  <div class="method-toggle">
+    <button class="method-btn on" id="meth-text" onclick="setMethod('text')">
+      <span class="method-icon">✏️</span>
+      <div><div class="method-label">Texto</div><div class="method-desc">Cole mensagem ou lista</div></div>
+    </button>
+    <button class="method-btn" id="meth-upload" onclick="setMethod('upload')">
+      <span class="method-icon">📸</span>
+      <div><div class="method-label">Print</div><div class="method-desc">Foto, screenshot, post</div></div>
+    </button>
+  </div>
+
+  <!-- PANEL: TEXT -->
+  <div class="input-panel on" id="panel-text">
+    <div class="hint-box">
+      💬 &nbsp;"A Fernanda adorou o Ginza Sand — wagyu katsu sando, faz fila mas vale. O PST em Roppongi também é imperdível, melhor pizza do Japão. E vai ao Golden Gai de noite, chega depois das 21h sem plano..."
+    </div>
+    <div class="field">
+      <textarea class="textarea big" id="tip-textarea" placeholder="Cole as dicas aqui..."></textarea>
+    </div>
+  </div>
+
+  <!-- PANEL: UPLOAD -->
+  <div class="input-panel" id="panel-upload">
+    <div class="upload-zone" id="upload-zone"
+      onclick="document.getElementById('upload-input').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <div class="upload-zone-icon">🖼</div>
+      <div class="upload-zone-label">Clique ou arraste um print aqui</div>
+      <div class="upload-zone-sub">JPG, PNG, WEBP — o Claude vai ler o texto da imagem</div>
+    </div>
+    <input type="file" class="upload-input" id="upload-input" accept="image/*" multiple onchange="handleFiles(this.files)" />
+    <div class="upload-previews" id="upload-previews"></div>
+    <div class="upload-note" id="upload-note" style="display:none">✓ Imagem carregada — o Claude vai extrair as dicas automaticamente ao continuar.</div>
+  </div>
+
+  <div class="tips-queue" id="tips-queue" style="display:none">
+    <div class="queue-label">
+      <span>Dicas já adicionadas</span>
+      <span class="queue-count" id="queue-count">0</span>
+    </div>
+    <div id="queue-items"></div>
+  </div>
+  <div class="nav-row">
+    <button class="back-btn" onclick="goTo(0)">← Voltar</button>
+    <button class="btn btn-primary" onclick="submitTip()">Continuar →</button>
+  </div>
+</div>
+
+<!-- ══ PAGE 2: QUEM DEU? ══ -->
+<div class="page" id="page-2">
+  <div class="eyebrow">Passo 2</div>
+  <h1 class="page-title">Quem te deu essa <em style="font-family:'Cormorant Garamond',serif">dica</em>?</h1>
+  <p class="page-sub">Selecione quem indicou — isso define o peso de cada recomendação no mapa final.</p>
+  <div class="friend-grid" id="friend-grid"></div>
+  <button class="new-friend-btn" onclick="addNewFriend()">+ Adicionar novo amigo</button>
+  <div class="nav-row">
+    <button class="back-btn" onclick="goTo(1)">← Voltar</button>
+    <button class="btn btn-primary" id="btn-who-next" onclick="whoNext()" disabled>Continuar →</button>
+  </div>
+</div>
+
+<!-- ══ PAGE 3: PERFIL DA FONTE ══ -->
+<div class="page" id="page-3">
+  <div class="step-dots" id="p3-dots"></div>
+  <div class="eyebrow" id="p3-eyebrow">Perfil da fonte</div>
+  <h1 class="page-title" id="p3-title">Como é <em style="font-family:'Cormorant Garamond',serif">—</em> como viajante?</h1>
+  <p class="page-sub" id="p3-sub">Isso define quanto a dica dela pesa em cada categoria do mapa.</p>
+  <div id="p3-body"></div>
+  <div class="nav-row">
+    <button class="back-btn" onclick="goTo(2)">← Voltar</button>
+    <button class="btn btn-primary" id="btn-p3-next" onclick="saveSourceProfile()" disabled>Continuar →</button>
+  </div>
+</div>
+
+<!-- ══ PAGE 4: SEU PERFIL ══ -->
+<div class="page" id="page-4">
+  <div class="step-dots" id="p4-dots"></div>
+  <div class="eyebrow" id="p4-eyebrow">Perfil 1 de 4</div>
+  <h1 class="page-title" id="p4-title">—</h1>
+  <p class="page-sub" id="p4-sub">—</p>
+  <div class="multi-hint" id="p4-hint" style="display:none"></div>
+  <div id="p4-options"></div>
+  <div class="nav-row">
+    <button class="back-btn" id="p4-back" onclick="qBack()">← Anterior</button>
+    <button class="btn btn-primary" id="p4-next" onclick="qNext()" disabled>Próxima →</button>
+  </div>
+</div>
+
+<!-- ══ PAGE 5: PROCESSING ══ -->
+<div class="page" id="page-5">
+  <div class="proc-wrap">
+    <span class="proc-icon">🗺</span>
+    <div class="proc-title">Montando o mapa...</div>
+    <div class="proc-sub">Claude está analisando as dicas, cruzando fontes e calculando o <em>taste fit</em> para <strong id="proc-dest">—</strong>.</div>
+    <div class="proc-log" id="proc-log"></div>
+    <div class="proc-bar-wrap"><div class="proc-bar" id="proc-bar"></div></div>
+  </div>
+</div>
+
+<!-- ══ PAGE 6: YOUR PROFILE RESULT ══ -->
+<div class="page" id="page-6">
+  <div class="eyebrow" id="res-dest-label">—</div>
+  <div class="result-card">
+    <div class="result-title" id="res-title">—</div>
+    <div class="result-sub" id="res-sub">—</div>
+    <div class="profile-tags" id="res-tags"></div>
+    <div class="rules-title">Suas regras de viagem</div>
+    <ul class="rules-list" id="res-rules"></ul>
+  </div>
+  <p class="page-sub" style="margin-bottom:16px">Tudo pronto. Agora o Claude vai cruzar seu perfil com as dicas e gerar o mapa.</p>
+  <div class="nav-row">
+    <button class="back-btn" onclick="goTo(4); currentQ = QUESTIONS.length-1; renderQuestion(currentQ);">← Editar perfil</button>
+    <button class="btn btn-gold" onclick="processAll()">✦ Gerar mapa →</button>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- ══ PAGE MAP (full screen) ══ -->
+<div class="page" id="page-map" style="display:none; flex-direction:column; height:100vh; overflow:hidden;">
+  <div class="map-cat-bar">
+    <button class="cat-tab on" onclick="setCat('all',this)">Todos</button>
+    <button class="cat-tab" onclick="setCat('rest',this)">🍽 Restaurante</button>
+    <button class="cat-tab" onclick="setCat('bar',this)">🍸 Bar</button>
+    <button class="cat-tab" onclick="setCat('cafe',this)">☕ Café</button>
+    <button class="cat-tab" onclick="setCat('act',this)">⛩ Atividade</button>
+    <button class="cat-tab" onclick="setCat('shop',this)">🛍 Shopping</button>
+    <div style="flex:1"></div>
+    <button class="back-btn" style="font-size:12px;padding:0 8px" onclick="goTo(6)">← voltar</button>
+  </div>
+  <div class="map-body">
+    <div class="map-sidebar">
+      <div class="map-filters">
+        <div class="filter-wrap">
+          <div class="filter-label">Fonte</div>
+          <select class="filter-select" id="filter-who" onchange="renderMapPlaces()">
+            <option value="all">Todos</option>
+          </select>
+        </div>
+        <div class="filter-wrap">
+          <div class="filter-label">Ordenar</div>
+          <select class="filter-select" id="filter-sort" onchange="renderMapPlaces()">
+            <option value="score">Taste fit</option>
+            <option value="overlap">Mais indicados</option>
+            <option value="name">A – Z</option>
+          </select>
+        </div>
+      </div>
+      <div class="map-count" id="map-count"></div>
+      <div class="map-cards" id="map-cards"></div>
+    </div>
+    <div class="map-wrap"><div id="map"></div></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────
+let destination = '';
+let tips = [];          // [{text, friendId}]
+let friends = {};       // {id: {name, trust, specialties, freeText}}
+let answers = {};       // quiz answers
+let places = [];        // processed places
+let pendingTip = '';
+let pendingFriendId = null;
+let uploadedImages = []; // [{dataUrl, file}]
+let currentMethod = 'text';
+let pendingTipType = 'text'; // 'text' | 'image'
+let pendingImages = [];      // images for current pending tip
+let friendSeq = 0;
+let currentQ = 0;
+let currentCat = 'all';
+let mapInst = null, mapMarkers = [];
+
+const CAT_COLORS = { rest:'#8B3A3A', bar:'#4A3A6B', cafe:'#6B4A1E', shop:'#1E4A6B', act:'#2A5C3A' };
+const CAT_LABELS = { rest:'Restaurante', bar:'Bar', cafe:'Café', shop:'Shopping', act:'Atividade' };
+const CAT_ICONS  = { rest:'🍽', bar:'🍸', cafe:'☕', shop:'🛍', act:'⛩' };
+
+const TRUST_OPTS = [
+  { val:'same',   emoji:'🎯', label:'Mesmo gosto que eu', desc:'Quando ela recomenda, eu confio cegamente' },
+  { val:'expert', emoji:'🔑', label:'Expert no destino',  desc:'Conhece o local a fundo — morou ou vai sempre' },
+  { val:'good',   emoji:'👍', label:'Bom gosto geral',    desc:'Não é exatamente meu estilo, mas tem bom critério' },
+  { val:'context',emoji:'📖', label:'Contexto diferente', desc:'Viaja diferente de mim — peso menor, mas vale considerar' },
+];
+const SPECS = ['🍽 Comida', '🍸 Drinks / Bares', '☕ Cafés', '⛩ Cultura', '🛍 Compras', '🌿 Experiências locais', '✨ Luxo', '💰 Custo-benefício'];
+
+const QUESTIONS = [
+  { id:'q1', title:'Qual é o seu ritmo ideal de viagem?', sub:'Isso define quantas experiências por dia o itinerário vai sugerir.', type:'single',
+    options:[
+      {val:'slow',     emoji:'🌿', label:'Devagar e fundo',      desc:'2–3 coisas por dia, com tempo para respirar'},
+      {val:'balanced', emoji:'⚖️', label:'Equilibrado',           desc:'Uma âncora por período, espaço para o inesperado'},
+      {val:'packed',   emoji:'⚡', label:'Aproveitar ao máximo',  desc:'Quero ver tudo que dá'},
+    ]},
+  { id:'q2', title:'O que mais importa para você em comida?', sub:'Selecione até 2 opções.', type:'multi', max:2,
+    options:[
+      {val:'local',   emoji:'🏠', label:'Autêntico e local',    desc:'Onde os moradores comem'},
+      {val:'special', emoji:'⭐', label:'Experiência especial', desc:'Omakase, chef table, difícil de reservar'},
+      {val:'casual',  emoji:'🍜', label:'Casual e gostoso',     desc:'Excelência no simples'},
+      {val:'trendy',  emoji:'✨', label:'Bonito e descolado',   desc:'Conceitual, descoberta'},
+    ]},
+  { id:'q3', title:'Como você curte a vida noturna?', sub:'Sem resposta certa — é sobre o que te dá energia.', type:'single',
+    options:[
+      {val:'craft', emoji:'🍸', label:'Cocktails autorais',    desc:'Bar escondido, bartender criativo'},
+      {val:'wine',  emoji:'🍷', label:'Vinho e conversa',      desc:'Wine bar intimista, boa companhia'},
+      {val:'local', emoji:'🏮', label:'Raiz e autêntico',      desc:'Onde os moradores vão'},
+      {val:'skip',  emoji:'🌙', label:'Jantar cedo e hotel',   desc:'Prefiro aproveitar o dia'},
+    ]},
+  { id:'q4', title:'Fila de 40 min num lugar incrível. Você entra?', sub:'Calibra o peso de esforço vs recompensa.', type:'single',
+    options:[
+      {val:'yes',   emoji:'🙋', label:'Sim, se for autêntico', desc:'Vale se o lugar for de verdade'},
+      {val:'maybe', emoji:'🤔', label:'Depende do dia',        desc:'Com energia, sim. Sem energia, passo'},
+      {val:'no',    emoji:'🚶', label:'Prefiro não arriscar',  desc:'Quero chegar e sentar'},
+    ]},
+];
+
+const PROFILES = {
+  slow_local:    { title:'A Exploradora de Bairro', sub:'Você viaja para sentir, não para coletar.' },
+  slow_special:  { title:'A Curadora de Experiências', sub:'Menos é mais — e o que você escolhe é impecável.' },
+  balanced_local:{ title:'A Equilibrista Curiosa', sub:'Você sabe quando se aventurar e quando descansar.' },
+  balanced_special:{ title:'A Connoisseur Moderna', sub:'Alto gosto, ritmo consciente, noites memoráveis.' },
+  packed_special:{ title:'A Maximalista', sub:'Quer tudo — e sabe escolher o melhor de tudo.' },
+  packed_local:  { title:'A Detetive Local', sub:'Muita coisa, muito autêntica. Energia de explorador.' },
+};
+
+// ─────────────────────────────────────────────────────────
+// NAV
+// ─────────────────────────────────────────────────────────
+const PAGE_STEPS = { 0:0, 1:1, 2:2, 3:3, 4:4, 5:4, 6:4, map:5 };
+const PAGE_PCTS  = { 0:0, 1:20, 2:38, 3:54, 4:68, 5:80, 6:85, map:100 };
+
+function goTo(n) {
+  document.querySelectorAll('.page').forEach(p => { p.style.display='none'; p.classList.remove('active'); });
+  const pid = n === 'map' ? 'page-map' : 'page-' + n;
+  const el = document.getElementById(pid);
+  if (!el) return;
+  if (n === 'map') {
+    document.getElementById('main-wrap').style.display = 'none';
+    el.style.display = 'flex';
+    el.classList.add('active');
+  } else {
+    document.getElementById('main-wrap').style.display = '';
+    el.style.display = 'block';
+    el.classList.add('active');
+  }
+  // progress & nav
+  const pct = PAGE_PCTS[n] ?? 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  const stepIdx = PAGE_STEPS[n] ?? 0;
+  document.querySelectorAll('.snav').forEach((s, i) => {
+    s.className = 'snav' + (i === stepIdx ? ' active' : i < stepIdx ? ' done' : '');
+  });
+  if (destination) document.getElementById('header-dest').innerHTML = '<strong>' + escH(destination) + '</strong>';
+  window.scrollTo(0, 0);
+}
+
+function toast(msg, ms=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ─────────────────────────────────────────────────────────
+// PAGE 0
+// ─────────────────────────────────────────────────────────
+function onDestInput(val) {
+  document.getElementById('btn-start').disabled = !val.trim();
+}
+function startFlow() {
+  destination = document.getElementById('dest-input').value.trim();
+  if (!destination) return;
+  document.getElementById('proc-dest').textContent = destination;
+  goTo(1);
+}
+
+// ─────────────────────────────────────────────────────────
+// PAGE 1 — METHOD TOGGLE
+// ─────────────────────────────────────────────────────────
+function setMethod(m) {
+  currentMethod = m;
+  document.getElementById('meth-text').classList.toggle('on', m === 'text');
+  document.getElementById('meth-upload').classList.toggle('on', m === 'upload');
+  document.getElementById('panel-text').classList.toggle('on', m === 'text');
+  document.getElementById('panel-upload').classList.toggle('on', m === 'upload');
+}
+
+// ─────────────────────────────────────────────────────────
+// PAGE 1 — IMAGE UPLOAD
+// ─────────────────────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+}
+
+function handleFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      uploadedImages.push({ dataUrl: ev.target.result, file });
+      renderPreviews();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPreviews() {
+  const wrap = document.getElementById('upload-previews');
+  const note = document.getElementById('upload-note');
+  wrap.innerHTML = uploadedImages.map((img, i) => `
+    <div class="preview-wrap">
+      <img class="preview-thumb" src="${img.dataUrl}" alt="print ${i+1}" />
+      <button class="preview-remove" onclick="removeImage(${i})">✕</button>
+    </div>
+  `).join('');
+  note.style.display = uploadedImages.length ? 'block' : 'none';
+}
+
+function removeImage(i) {
+  uploadedImages.splice(i, 1);
+  renderPreviews();
+}
+
+// ─────────────────────────────────────────────────────────
+// PAGE 1 — SUBMIT TIP
+// ─────────────────────────────────────────────────────────
+async function submitTip() {
+  if (currentMethod === 'text') {
+    const text = document.getElementById('tip-textarea').value.trim();
+    if (!text) { toast('Cole uma dica antes de continuar'); return; }
+    pendingTip = text;
+    pendingTipType = 'text';
+  } else {
+    if (!uploadedImages.length) { toast('Faça upload de pelo menos um print'); return; }
+    // We'll pass image(s) to Claude at processing time — store as pending
+    pendingTip = '[imagem]';
+    pendingTipType = 'image';
+    pendingImages = [...uploadedImages];
+  }
+  renderFriendGrid();
+  goTo(2);
+}
+
+function renderQueuePanel() {
+  const wrap = document.getElementById('tips-queue');
+  const items = document.getElementById('queue-items');
+  if (!tips.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  document.getElementById('queue-count').textContent = tips.length;
+  items.innerHTML = tips.map((t, i) => {
+    const f = friends[t.friendId];
+    const preview = t.type === 'image' && t.images.length
+      ? `<img src="${t.images[0].dataUrl}" style="width:36px;height:36px;border-radius:5px;object-fit:cover;flex-shrink:0;border:1px solid var(--border)" />`
+      : '';
+    const label = t.type === 'image' ? `📸 ${t.images.length} print${t.images.length!==1?'s':''}` : escH(t.text.substring(0,140)) + (t.text.length>140?'…':'');
+    return `<div class="queue-item">
+      ${preview}
+      <div class="qi-text">${label}</div>
+      <div class="qi-who">${f ? escH(f.name) : '—'}</div>
+      <button class="qi-del" onclick="deleteTip(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteTip(i) { tips.splice(i, 1); renderQueuePanel(); }
+
+// ─────────────────────────────────────────────────────────
+// PAGE 2 — WHO
+// ─────────────────────────────────────────────────────────
+function renderFriendGrid() {
+  const grid = document.getElementById('friend-grid');
+  pendingFriendId = null;
+  document.getElementById('btn-who-next').disabled = true;
+  const ids = Object.keys(friends);
+  if (!ids.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;font-size:13px;color:var(--ink3);padding:4px 0 8px">Nenhum amigo ainda — adicione abaixo 👇</div>';
+    return;
+  }
+  grid.innerHTML = ids.map(id => {
+    const f = friends[id];
+    const trust = TRUST_OPTS.find(o => o.val === f.trust);
+    const tagStr = trust ? trust.label : (f.specialties.length ? f.specialties[0] : 'sem classificação');
+    return `<div class="friend-card" id="fc-${id}" onclick="selectFriend('${id}')">
+      <div class="fc-name">${escH(f.name)}</div>
+      <div class="fc-tags">${escH(tagStr)}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectFriend(id) {
+  pendingFriendId = id;
+  document.querySelectorAll('.friend-card').forEach(c => c.classList.remove('sel'));
+  const btn = document.getElementById(`fc-${id}`);
+  if (btn) btn.classList.add('sel');
+  document.getElementById('btn-who-next').disabled = false;
+}
+
+function addNewFriend() {
+  const name = prompt('Nome do amigo:');
+  if (!name || !name.trim()) return;
+  const id = 'f' + (++friendSeq);
+  friends[id] = { name: name.trim(), trust: null, specialties: [], freeText: '' };
+  pendingFriendId = id;
+  renderFriendGrid();
+  // go to profile page for new friend
+  loadP3(id);
+  goTo(3);
+}
+
+function whoNext() {
+  if (!pendingFriendId) { toast('Selecione quem deu a dica'); return; }
+  const f = friends[pendingFriendId];
+  const hasProfile = f.trust !== null || f.specialties.length > 0 || f.freeText;
+  if (hasProfile) {
+    // already profiled — commit tip and ask if more
+    commitTip();
+  } else {
+    loadP3(pendingFriendId);
+    goTo(3);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// PAGE 3 — SOURCE PROFILE
+// ─────────────────────────────────────────────────────────
+function loadP3(id) {
+  const f = friends[id];
+  document.getElementById('p3-title').innerHTML = `Como é <em style="font-family:'Cormorant Garamond',serif">${escH(f.name)}</em> como viajante?`;
+  document.getElementById('p3-sub').textContent = 'Isso define o peso de cada dica dela no mapa. Quanto mais preciso, melhor o resultado.';
+
+  const body = document.getElementById('p3-body');
+  body.innerHTML = `
+    <div class="trust-options" id="trust-opts">
+      ${TRUST_OPTS.map(o => `
+        <div class="trust-opt${f.trust===o.val?' sel':''}" onclick="setTrustOpt('${id}','${o.val}',this)">
+          <span class="trust-opt-emoji">${o.emoji}</span>
+          <div>
+            <div class="trust-opt-label">${o.label}</div>
+            <div class="trust-opt-desc">${o.desc}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="spec-section-title">Melhor para (selecione os que se aplicam)</div>
+    <div class="spec-pills" id="spec-pills-${id}">
+      ${SPECS.map(sp => `<div class="spec-pill${f.specialties.includes(sp)?' sel':''}" onclick="toggleSpec(this,'${id}','${escH(sp)}')">${sp}</div>`).join('')}
+    </div>
+    <div class="field">
+      <div class="label">Contexto livre (opcional)</div>
+      <textarea class="textarea" style="min-height:70px" id="ft-${id}" placeholder="ex: ela é sommelier, confio 100% em bar mas não na comida...">${escH(f.freeText)}</textarea>
+    </div>
+  `;
+
+  // Update next button
+  document.getElementById('btn-p3-next').disabled = !f.trust;
+}
+
+function setTrustOpt(friendId, val, el) {
+  const f = friends[friendId];
+  if (!f) return;
+  f.trust = val;
+  el.closest('.trust-options').querySelectorAll('.trust-opt').forEach(o => o.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('btn-p3-next').disabled = false;
+}
+
+function toggleSpec(el, friendId, sp) {
+  const f = friends[friendId];
+  if (!f) return;
+  el.classList.toggle('sel');
+  const i = f.specialties.indexOf(sp);
+  if (i > -1) f.specialties.splice(i, 1);
+  else f.specialties.push(sp);
+}
+
+function saveSourceProfile() {
+  const id = pendingFriendId;
+  if (!id) return;
+  const f = friends[id];
+  const ft = document.getElementById(`ft-${id}`);
+  if (ft) f.freeText = ft.value.trim();
+  commitTip();
+}
+
+function commitTip() {
+  tips.push({ text: pendingTip, friendId: pendingFriendId, type: pendingTipType, images: pendingTipType === 'image' ? [...pendingImages] : [] });
+  pendingTip = '';
+  pendingFriendId = null;
+  pendingTipType = 'text';
+  pendingImages = [];
+  // Reset upload state for next tip
+  uploadedImages = [];
+  renderPreviews();
+  document.getElementById('tip-textarea').value = '';
+  renderQueuePanel();
+
+  if (tips.length === 1 && Object.keys(answers).length === 0) {
+    currentQ = 0;
+    renderQuestion(0);
+    goTo(4);
+  } else {
+    goTo(1);
+    toast('Dica salva! ✓ Cole mais ou gere o mapa.');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// PAGE 4 — YOUR PROFILE (quiz)
+// ─────────────────────────────────────────────────────────
+function renderQuestion(qIdx) {
+  const q = QUESTIONS[qIdx];
+  document.getElementById('p4-eyebrow').textContent = `Seu perfil ${qIdx+1} de ${QUESTIONS.length}`;
+  document.getElementById('p4-title').textContent = q.title;
+  document.getElementById('p4-sub').textContent = q.sub;
+
+  const hint = document.getElementById('p4-hint');
+  if (q.type === 'multi') { hint.style.display='block'; hint.textContent = `Selecione até ${q.max}`; }
+  else hint.style.display = 'none';
+
+  // dots
+  document.getElementById('p4-dots').innerHTML = QUESTIONS.map((_,i) =>
+    `<div class="sdot${i<qIdx?' done':i===qIdx?' active':''}"></div>`
+  ).join('');
+
+  const saved = answers[q.id] || (q.type==='multi' ? [] : null);
+  const isGrid = q.options.length >= 4;
+  document.getElementById('p4-options').innerHTML =
+    `<div class="options${isGrid?' grid2':''}">` +
+    q.options.map(o => {
+      const isSel = q.type==='multi' ? (saved||[]).includes(o.val) : saved===o.val;
+      return `<div class="option${isSel?' sel':''}" onclick="selectOpt(this,'${q.id}','${o.val}',${q.type==='multi'},${q.max||1})">
+        <span class="opt-emoji">${o.emoji}</span>
+        <div><div class="opt-label">${o.label}</div><div class="opt-desc">${o.desc}</div></div>
+      </div>`;
+    }).join('') + '</div>';
+
+  const hasAns = q.type==='multi' ? (answers[q.id]||[]).length > 0 : !!answers[q.id];
+  document.getElementById('p4-next').disabled = !hasAns;
+  document.getElementById('p4-next').textContent = qIdx < QUESTIONS.length-1 ? 'Próxima →' : 'Ver meu perfil →';
+  document.getElementById('p4-back').textContent = '← ' + (qIdx === 0 ? 'Voltar' : 'Anterior');
+}
+
+function selectOpt(el, qId, val, isMulti, max) {
+  const container = el.parentElement;
+  if (isMulti) {
+    const selected = container.querySelectorAll('.sel');
+    if (el.classList.contains('sel')) {
+      el.classList.remove('sel');
+      answers[qId] = (answers[qId]||[]).filter(v => v !== val);
+    } else {
+      if (selected.length >= max) selected[0].classList.remove('sel');
+      el.classList.add('sel');
+      if (!answers[qId]) answers[qId] = [];
+      answers[qId] = Array.from(container.querySelectorAll('.sel')).map(e => {
+        const m = e.getAttribute('onclick').match(/'([^']+)'/g);
+        return m && m[2] ? m[2].replace(/'/g,'') : null;
+      }).filter(Boolean);
+      if (!answers[qId].includes(val)) answers[qId].push(val);
+    }
+    document.getElementById('p4-next').disabled = (answers[qId]||[]).length === 0;
+  } else {
+    container.querySelectorAll('.option').forEach(o => o.classList.remove('sel'));
+    el.classList.add('sel');
+    answers[qId] = val;
+    document.getElementById('p4-next').disabled = false;
+  }
+}
+
+function qNext() {
+  if (currentQ < QUESTIONS.length - 1) {
+    currentQ++; renderQuestion(currentQ);
+  } else {
+    generateProfile();
+  }
+}
+function qBack() {
+  if (currentQ > 0) { currentQ--; renderQuestion(currentQ); }
+  else goTo(3);
+}
+
+// ─────────────────────────────────────────────────────────
+// PROFILE GENERATION
+// ─────────────────────────────────────────────────────────
+const TAG_MAP = {
+  slow:'🌿 Ritmo tranquilo', balanced:'⚖️ Equilibrado', packed:'⚡ Intenso',
+  local:'🏠 Autenticidade', special:'⭐ Experiências especiais', casual:'🍜 Casual & gostoso', trendy:'✨ Descolado',
+  craft:'🍸 Cocktails autorais', wine:'🍷 Vinho e conversa',
+  yes:'🙋 Topa fila (se valer)', maybe:'🤔 Fila com critério', no:'🚶 Sem filas',
+};
+
+function generateProfile() {
+  const q1 = answers.q1 || 'balanced';
+  const q2 = Array.isArray(answers.q2) ? answers.q2[0] : (answers.q2||'local');
+  const q3 = answers.q3 || 'craft';
+  const q4 = answers.q4 || 'maybe';
+
+  const key = q1 + '_' + q2;
+  const profile = PROFILES[key] || { title:'A Viajante com Estilo Próprio', sub:'Seu perfil é único — e o mapa vai refletir isso.' };
+  const tags = [TAG_MAP[q1], TAG_MAP[q2], TAG_MAP[q3], TAG_MAP[q4]].filter(Boolean);
+  const rules = [];
+  if (q1==='slow') rules.push('Máximo 2–3 experiências por dia. Espaço para o inesperado.');
+  if (q1==='balanced') rules.push('1 âncora por período. Flexibilidade no resto.');
+  if (q1==='packed') rules.push('Aproveitar ao máximo — mas com curadoria, não caos.');
+  if (q2==='local') rules.push('Lugares locais > turísticos. Autenticidade > hype.');
+  if (q2==='special') rules.push('1 experiência especial por dia. Qualidade > quantidade.');
+  if (q3==='craft') rules.push('Bares com intenção. Bartender que sabe o que faz.');
+  if (q3==='wine') rules.push('Wine bars intimistas. Vinho como conversa, não performance.');
+  if (q4==='yes') rules.push('Fila vale se o lugar for autêntico — não se for viral.');
+  if (q4==='no') rules.push('Sem filas. Sempre ter plano B.');
+
+  // Add source trust rules
+  Object.values(friends).forEach(f => {
+    if (!f.name) return;
+    if (f.trust === 'same') rules.push(`Dicas de ${f.name} têm peso máximo — mesmo gosto.`);
+    if (f.trust === 'expert') rules.push(`Dicas de ${f.name} têm peso alto — expert no destino.`);
+  });
+
+  document.getElementById('res-dest-label').textContent = destination.toUpperCase();
+  document.getElementById('res-title').textContent = profile.title;
+  document.getElementById('res-sub').textContent = profile.sub;
+  document.getElementById('res-tags').innerHTML = tags.map(t => `<span class="profile-tag">${t}</span>`).join('');
+  document.getElementById('res-rules').innerHTML = rules.map(r => `<li><span class="rule-icon">→</span> ${r}</li>`).join('');
+
+  goTo(6);
+}
+
+// ─────────────────────────────────────────────────────────
+// PROCESS WITH CLAUDE
+// ─────────────────────────────────────────────────────────
+async function processAll() {
+  if (!tips.length) { toast('Adicione pelo menos uma dica'); return; }
+  goTo(5);
+
+  const log = document.getElementById('proc-log');
+  const bar = document.getElementById('proc-bar');
+  function lg(msg, gold=false) {
+    const l = document.createElement('span');
+    l.className = 'll' + (gold?' lg':'');
+    l.textContent = '› ' + msg + '\n';
+    log.appendChild(l); log.scrollTop = log.scrollHeight;
+  }
+  function prog(n) { bar.style.width = n + '%'; }
+
+  lg('Iniciando análise...'); prog(8);
+
+  const friendProfiles = Object.values(friends).map(f => {
+    const t = TRUST_OPTS.find(o => o.val === f.trust);
+    return `- ${f.name}: confiança="${t ? t.label : 'não definido'}", especialidades=[${f.specialties.join(', ')}]. ${f.freeText || ''}`;
+  }).join('\n');
+
+  const travelerCtx = [
+    answers.q1 ? `ritmo=${answers.q1}` : '',
+    answers.q2 ? `comida=[${[].concat(answers.q2).join(',')}]` : '',
+    answers.q3 ? `noite=${answers.q3}` : '',
+    answers.q4 ? `fila=${answers.q4}` : '',
+  ].filter(Boolean).join(', ');
+
+  const tipsBlock = tips.map((t, i) => {
+    const f = friends[t.friendId];
+    return `DICA ${i+1} — de ${f ? f.name : 'desconhecido'}:\n${t.type === 'image' ? '[Ver imagem anexada — extraia os lugares visíveis]' : t.text}`;
+  }).join('\n\n---\n\n');
+
+  // Build user message — text + any images
+  const imageContents = [];
+  tips.forEach(t => {
+    if (t.type === 'image' && t.images.length) {
+      t.images.forEach(img => {
+        const mediaType = img.file.type || 'image/jpeg';
+        const b64 = img.dataUrl.split(',')[1];
+        imageContents.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } });
+      });
+    }
+  });
+
+  const userContent = imageContents.length
+    ? [...imageContents, { type: 'text', text: tipsBlock }]
+    : tipsBlock;
+
+  lg(`Cruzando ${tips.length} dica(s) de ${Object.keys(friends).length} fonte(s)...`); prog(22);
+
+  const systemPrompt = `Você é um assistente especialista em curadoria de viagens. Analise as dicas e gere um JSON estruturado de lugares com score de taste fit personalizado.
+
+DESTINO: ${destination}
+PERFIL DO VIAJANTE: ${travelerCtx}
+
+FONTES / AMIGOS (perfil de cada um):
+${friendProfiles}
+
+REGRAS DE SCORING (score final = taste fit com o viajante, de 1.0 a 5.0):
+- Considere o nível de confiança de cada amigo: "mesmo gosto" = peso 1.0x, "expert no destino" = peso 0.9x, "bom gosto" = 0.7x, "contexto diferente" = 0.5x
+- Se o amigo tem especialidade que corresponde à categoria do lugar (ex: amigo boa para drinks → dica de bar), score base sobe
+- Se o MESMO lugar foi indicado por MÚLTIPLOS amigos: bônus de +0.5 a +1.0, shortlist:true obrigatório
+- Calibre pelo perfil do viajante: se viajante é "local/autenticidade", lugares turísticos perdem pontos
+- Scores devem ser VARIADOS (1.5 a 5.0) — não coloque tudo acima de 4.0
+- scoreReason deve explicar em 1 frase curta POR QUE esse score (ex: "Indicado por amigo com mesmo gosto, especialidade exata — alto fit")
+
+FORMATO DE CADA LUGAR:
+{
+  "name": "nome exato",
+  "cat": "rest" | "bar" | "cafe" | "shop" | "act",
+  "neighborhood": "bairro ou área em ${destination}",
+  "who": "Nome1 + Nome2 (se múltiplos) ou apenas Nome1",
+  "sources": ["Nome1", "Nome2"],
+  "note": "contexto da dica em 1-2 frases",
+  "score": 4.2,
+  "scoreReason": "1 frase explicando o score",
+  "lat": -00.0000,
+  "lng": 000.0000,
+  "shortlist": true | false
+}
+
+Retorne APENAS o array JSON, sem markdown, sem texto adicional, sem backticks.`;
+
+  lg('Enviando para o Claude...'); prog(38);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userContent }]
+      })
+    });
+
+    prog(65); lg('Processando resposta...');
+    const data = await res.json();
+    const raw = (data.content||[]).map(b=>b.text||'').join('').trim();
+    prog(80); lg('Extraindo lugares...');
+
+    let parsed = [];
+    try { parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch { const m = raw.match(/\[[\s\S]*\]/); if(m) parsed = JSON.parse(m[0]); else throw new Error('JSON inválido'); }
+
+    places = parsed.filter(p => p.name && p.lat && p.lng).map(p => ({
+      ...p,
+      score: Math.min(5, Math.max(1, parseFloat(p.score)||3)),
+      cat: p.cat || 'act',
+      sources: p.sources || [p.who||'—'],
+      shortlist: !!p.shortlist,
+    }));
+
+    lg(`${places.length} lugares identificados!`, true); prog(95);
+    lg(`Mapa pronto para ${destination} ✦`, true); prog(100);
+    setTimeout(() => buildMap(), 700);
+
+  } catch(err) {
+    lg('Erro: ' + err.message, true);
+    setTimeout(() => { toast('Erro ao processar. Tente novamente.'); goTo(6); }, 2000);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// MAP
+// ─────────────────────────────────────────────────────────
+function buildMap() {
+  goTo('map');
+
+  const sel = document.getElementById('filter-who');
+  sel.innerHTML = '<option value="all">Todos</option>';
+  Object.values(friends).forEach(f => {
+    const o = document.createElement('option');
+    o.value = f.name; o.textContent = f.name; sel.appendChild(o);
+  });
+
+  if (mapInst) { mapInst.remove(); mapInst = null; }
+  const lats = places.map(p=>p.lat), lngs = places.map(p=>p.lng);
+  const cLat = lats.reduce((a,b)=>a+b,0)/lats.length;
+  const cLng = lngs.reduce((a,b)=>a+b,0)/lngs.length;
+
+  mapInst = L.map('map', { zoomControl:true }).setView([cLat, cLng], 13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution:'© OpenStreetMap © CARTO', maxZoom:19
+  }).addTo(mapInst);
+  mapInst.zoomControl.setPosition('topright');
+  renderMapPlaces();
+}
+
+function makePin(cat, isShortlist) {
+  const color = CAT_COLORS[cat] || '#888';
+  const icon = CAT_ICONS[cat] || '📍';
+  if (isShortlist) {
+    return L.divIcon({
+      html:`<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">
+        <ellipse cx="15" cy="35" rx="5" ry="2" fill="rgba(26,23,20,0.12)"/>
+        <path d="M15 2 C8 2 2 8 2 15 C2 25 15 36 15 36 C15 36 28 25 28 15 C28 8 22 2 15 2Z" fill="${color}" opacity="0.92"/>
+        <text x="15" y="13" text-anchor="middle" font-size="9">★</text>
+        <text x="15" y="25" text-anchor="middle" font-size="11">${icon}</text>
+      </svg>`,
+      className:'', iconSize:[30,38], iconAnchor:[15,36], popupAnchor:[0,-34]
+    });
+  }
+  return L.divIcon({
+    html:`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="30" viewBox="0 0 24 30">
+      <ellipse cx="12" cy="28" rx="4" ry="1.5" fill="rgba(26,23,20,0.10)"/>
+      <path d="M12 1 C6 1 1 6 1 12 C1 20 12 29 12 29 C12 29 23 20 23 12 C23 6 18 1 12 1Z" fill="${color}" opacity="0.78"/>
+      <text x="12" y="18" text-anchor="middle" font-size="11">${icon}</text>
+    </svg>`,
+    className:'', iconSize:[24,30], iconAnchor:[12,29], popupAnchor:[0,-27]
+  });
+}
+
+function getFiltered() {
+  const who = document.getElementById('filter-who')?.value || 'all';
+  const sort = document.getElementById('filter-sort')?.value || 'score';
+  let list = places.filter(p => {
+    if (currentCat !== 'all' && p.cat !== currentCat) return false;
+    if (who !== 'all' && !(p.sources||[p.who]).includes(who)) return false;
+    return true;
+  });
+  if (sort === 'score') list.sort((a,b) => b.score-a.score);
+  else if (sort === 'overlap') list.sort((a,b) => (b.sources||[]).length-(a.sources||[]).length || b.score-a.score);
+  else list.sort((a,b) => a.name.localeCompare(b.name));
+  return list;
+}
+
+function renderMapPlaces() {
+  if (!mapInst) return;
+  mapMarkers.forEach(m => mapInst.removeLayer(m.marker));
+  mapMarkers = [];
+  const filtered = getFiltered();
+  document.getElementById('map-count').textContent = `${filtered.length} lugar${filtered.length!==1?'es':''} encontrado${filtered.length!==1?'s':''}`;
+
+  filtered.forEach(p => {
+    const multi = (p.sources||[p.who]).length > 1;
+    const m = L.marker([p.lat, p.lng], { icon: makePin(p.cat, p.shortlist) }).addTo(mapInst);
+    const srcStr = (p.sources||[p.who]).join(' + ');
+    m.bindPopup(`
+      <div class="pop-name">${escH(p.name)}${p.shortlist?' ★':''}</div>
+      <div class="pop-meta">${CAT_LABELS[p.cat]||p.cat}${p.neighborhood?' · '+escH(p.neighborhood):''}</div>
+      <span class="pop-score-badge">taste fit ${p.score} / 5</span>
+      ${multi ? `<div class="pop-overlap">✦ indicado por ${escH(srcStr)}</div>` : ''}
+      ${p.note ? `<div class="pop-note">${escH(p.note)}</div>` : ''}
+      ${p.scoreReason ? `<div style="font-size:11px;color:var(--ink3);font-style:italic;margin-bottom:7px">${escH(p.scoreReason)}</div>` : ''}
+      <div class="pop-links">
+        <a class="pop-link" href="https://www.google.com/maps/search/${encodeURIComponent(p.name)}/@${p.lat},${p.lng},17z" target="_blank">Google Maps →</a>
+      </div>
+    `, { maxWidth: 270 });
+    m.on('click', () => hlCard(p.name));
+    mapMarkers.push({ marker:m, name:p.name });
+  });
+
+  const shortlist = filtered.filter(p => p.shortlist).sort((a,b)=>b.score-a.score);
+  const rest = filtered.filter(p => !p.shortlist).sort((a,b)=>b.score-a.score);
+  let html = '';
+  if (shortlist.length) { html += `<div class="sec-label">★ Shortlist</div>`; shortlist.forEach(p => { html += cardHtml(p); }); }
+  if (rest.length) { html += `<div class="sec-label">Outros lugares</div>`; rest.forEach(p => { html += cardHtml(p); }); }
+  if (!filtered.length) html = `<div style="padding:20px 8px;text-align:center;font-size:12px;color:var(--ink3)">Nenhum lugar com esses filtros.</div>`;
+  document.getElementById('map-cards').innerHTML = html;
+}
+
+function cardHtml(p) {
+  const id = 'c' + Math.random().toString(36).slice(2,7);
+  const multi = (p.sources||[p.who]).length > 1;
+  return `<div class="pc" id="${id}" data-name="${escH(p.name)}" onclick="focusP('${p.name.replace(/'/g,"\\'").replace(/"/g,'')}',${p.lat},${p.lng})">
+    <div class="pc-r1">
+      <div class="pc-name">${escH(p.name)}${p.shortlist?'<span style="color:var(--gold);font-size:10px"> ★</span>':''}</div>
+      <div class="pc-meta">
+        <span class="pc-score">${p.score}</span>
+        <span class="pc-pill pill-${p.cat}">${CAT_LABELS[p.cat]||p.cat}</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+      ${multi ? `<div class="pc-overlap">✦ ${escH((p.sources||[p.who]).join(' + '))}</div>` : `<div class="pc-who">${escH(p.who||'—')}</div>`}
+      ${p.note ? `<button class="pc-toggle" onclick="event.stopPropagation();tn('${id}')">ver ↓</button>` : ''}
+    </div>
+    ${p.note ? `<div class="pc-note-wrap" id="${id}-n">
+      <div class="pc-note">${escH(p.note)}</div>
+      ${p.scoreReason ? `<div class="pc-reason">${escH(p.scoreReason)}</div>` : ''}
+    </div>` : ''}
+  </div>`;
+}
+
+function tn(id) {
+  const w = document.getElementById(id+'-n');
+  const b = document.querySelector('#'+id+' .pc-toggle');
+  if (!w) return;
+  const o = w.classList.toggle('open');
+  if (b) b.textContent = o ? 'ver ↑' : 'ver ↓';
+}
+
+function focusP(name, lat, lng) {
+  mapInst.setView([lat, lng], 17);
+  mapMarkers.forEach(({marker,name:n}) => { if(n===name) marker.openPopup(); });
+  hlCard(name);
+}
+
+function hlCard(name) {
+  document.querySelectorAll('.pc').forEach(c => c.classList.toggle('lit', c.dataset.name === name));
+  const card = document.querySelector(`.pc[data-name="${CSS.escape(name)}"]`);
+  if (card) card.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function setCat(cat, btn) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('on'));
+  btn.classList.add('on');
+  renderMapPlaces();
+}
+
+function escH(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Init
+goTo(0);
+</script>
+</body>
+</html>
