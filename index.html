@@ -841,21 +841,17 @@ function addNewFriend() {
 
 function whoNext() {
   if (!pendingFriendId) { toast('Selecione quem deu a dica'); return; }
-  const f = friends[pendingFriendId];
-  const hasProfile = f.trust !== null || f.specialties.length > 0 || f.freeText;
-  if (hasProfile) {
-    // already profiled — commit tip and ask if more
-    commitTip();
-  } else {
-    loadP3(pendingFriendId);
-    goTo(3);
-  }
+  loadP3(pendingFriendId);
+  goTo(3);
 }
 
 // ─────────────────────────────────────────────────────────
 // PAGE 3 — SOURCE PROFILE
 // ─────────────────────────────────────────────────────────
+let currentProfileId = null;
+
 function loadP3(id) {
+  currentProfileId = id;
   const f = friends[id];
   document.getElementById('p3-title').innerHTML = `Como é <em style="font-family:'Cormorant Garamond',serif">${escH(f.name)}</em> como viajante?`;
   document.getElementById('p3-sub').textContent = 'Isso define o peso de cada dica dela no mapa. Quanto mais preciso, melhor o resultado.';
@@ -882,8 +878,8 @@ function loadP3(id) {
     </div>
   `;
 
-  // Update next button
-  document.getElementById('btn-p3-next').disabled = !f.trust;
+  // Update next button — always enabled (trust is helpful but not blocking)
+  document.getElementById('btn-p3-next').disabled = false;
 }
 
 function setTrustOpt(friendId, val, el) {
@@ -905,11 +901,19 @@ function toggleSpec(el, friendId, sp) {
 }
 
 function saveSourceProfile() {
-  const id = pendingFriendId;
-  if (!id) return;
+  console.log('saveSourceProfile called, currentProfileId:', currentProfileId, 'pendingTip:', pendingTip);
+  const id = currentProfileId;
+  if (!id) { 
+    alert('Erro: volte para a tela anterior e selecione o amigo novamente.');
+    return; 
+  }
   const f = friends[id];
-  const ft = document.getElementById(`ft-${id}`);
-  if (ft) f.freeText = ft.value.trim();
+  if (f) {
+    const ft = document.getElementById(`ft-${id}`);
+    if (ft) f.freeText = ft.value.trim();
+  }
+  pendingFriendId = id;
+  if (!pendingTip) pendingTip = '(dica sem texto)';
   commitTip();
 }
 
@@ -919,10 +923,9 @@ function commitTip() {
   pendingFriendId = null;
   pendingTipType = 'text';
   pendingImages = [];
-  // Reset upload state for next tip
   uploadedImages = [];
-  renderPreviews();
-  document.getElementById('tip-textarea').value = '';
+  try { renderPreviews(); } catch(e) {}
+  try { document.getElementById('tip-textarea').value = ''; } catch(e) {}
   renderQueuePanel();
 
   if (tips.length === 1 && Object.keys(answers).length === 0) {
@@ -1140,30 +1143,53 @@ FORMATO DE CADA LUGAR:
   "shortlist": true | false
 }
 
-Retorne APENAS o array JSON, sem markdown, sem texto adicional, sem backticks.`;
+Retorne APENAS o array JSON puro. Comece com [ e termine com ]. Sem texto antes, sem texto depois, sem markdown, sem backticks, sem explicação.`;
 
   lg('Enviando para o Claude...'); prog(38);
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json', 
+        'x-api-key': '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', 
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 4096,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userContent }]
+        messages: [
+          { role: 'user', content: userContent },
+          { role: 'assistant', content: '[' }
+        ]
       })
     });
 
     prog(65); lg('Processando resposta...');
     const data = await res.json();
-    const raw = (data.content||[]).map(b=>b.text||'').join('').trim();
+    
+    // Check for API errors
+    if (data.error) throw new Error(data.error.message || 'Erro da API');
+    
+    const raw = '[' + (data.content||[]).map(b=>b.text||'').join('').trim();
     prog(80); lg('Extraindo lugares...');
 
     let parsed = [];
-    try { parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
-    catch { const m = raw.match(/\[[\s\S]*\]/); if(m) parsed = JSON.parse(m[0]); else throw new Error('JSON inválido'); }
+    // Try multiple parsing strategies
+    const cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();
+    try { 
+      parsed = JSON.parse(cleaned); 
+    } catch(e1) { 
+      const m = cleaned.match(/\[[\s\S]*\]/); 
+      if (m) {
+        try { parsed = JSON.parse(m[0]); } 
+        catch(e2) { throw new Error('Resposta do Claude não estava em formato JSON. Tente novamente.'); }
+      } else { 
+        throw new Error('Resposta do Claude não estava em formato JSON. Tente novamente.'); 
+      }
+    }
 
     places = parsed.filter(p => p.name && p.lat && p.lng).map(p => ({
       ...p,
